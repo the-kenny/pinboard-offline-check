@@ -48,8 +48,7 @@
                   (merge {:auth_token  (str user ":" token)}
                          (build-add-entry-from-post post)
                          {:replace true
-                          :tags (str/replace (get post "tags") "is:offline" "")})
-                  :debug true})))
+                          :tags (str/replace (get post "tags") "is:offline" "")})})))
 
 (defn add-offline-tag! [post user token]
   (when-not (already-offline-tagged? post)
@@ -58,22 +57,22 @@
                   (merge {:auth_token (str user ":" token)}
                          (build-add-entry-from-post post)
                          {:replace true
-                          :tags (str (get post "tags") " is:offline")})
-                  :debug true})))
+                          :tags (str (get post "tags") " is:offline")})})))
 
 (defn update-offline-status! [user token]
   (println "Requesting all posts...")
   (let [all (all-posts user token)]
+    (println "Got" (count all) "posts")
     (println "Collecting offline status... this might take a while")
     (doseq [x (add-offline-metadata all)]
       (when (-> x meta :offline?)
         (println "Adding tag 'is:offline' to '" (get x "description") "'")
-        (println "result: " (:body (add-offline-tag! x user token))))
+        (add-offline-tag! x user token))
       
       (when (and (already-offline-tagged? x)
                  (not (-> x meta :offline?)))
         (println "Removing tag 'is:offline' to '" (get x "description") "'")
-        (println "result: " (:body (remove-offline-tag! x user token)))))))
+        (remove-offline-tag! x user token)))))
 
-
-
+(defn -main [& [user token]]
+  (update-offline-status! user token))
