@@ -13,20 +13,12 @@
 
 (defn is-offline? [url]
   (try
-    (let [response (client/get url {:conn-timeout 1000})]
+    (println "Collecting offline status for " url)
+    (let [response (client/get url {:conn-timeout   (* 15 1000)
+                                    :socket-timeout (* 15 1000)})]
       (not= (:status response) 200))
     (catch Exception e
       true)))
-
-(defn add-offline-metadata [posts]
-  (let [result (atom [])]
-    (mapv deref
-          (for [p posts]
-            (future
-              (swap! result conj
-                     (with-meta p
-                       {:offline? (is-offline? (get p "href"))})))))
-    @result))
 
 (defn already-offline-tagged? [post]
   (contains? (set (str/split (get post "tags" "") #" "))
@@ -64,15 +56,16 @@
   (let [all (all-posts user token)]
     (println "Got" (count all) "posts")
     (println "Collecting offline status... this might take a while")
-    (doseq [x (add-offline-metadata all)]
-      (when (-> x meta :offline?)
-        (println "Adding tag 'is:offline' to '" (get x "description") "'")
-        (add-offline-tag! x user token))
+    (doseq [post all]
+      (let [x (with-meta post {:offline? (is-offline? (get post "href"))})]
+        (when (-> x meta :offline?)
+          (println "Adding tag 'is:offline' to '" (get x "description") "'")
+          (add-offline-tag! x user token))
       
-      (when (and (already-offline-tagged? x)
-                 (not (-> x meta :offline?)))
-        (println "Removing tag 'is:offline' to '" (get x "description") "'")
-        (remove-offline-tag! x user token)))))
+        (when (and (already-offline-tagged? x)
+                   (not (-> x meta :offline?)))
+          (println "Removing tag 'is:offline' to '" (get x "description") "'")
+          (remove-offline-tag! x user token))))))
 
 (defn -main [& [user token]]
   (update-offline-status! user token))
